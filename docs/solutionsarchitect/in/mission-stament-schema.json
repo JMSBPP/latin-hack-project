@@ -1,0 +1,66 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Mission Stament Schema",
+    "description": "JSON schema for mission statements",
+    "type": "object",
+    "required": ["Name", "Purpose", "Responsibilities", "Exclusions"],
+    "properties": {
+      "Name": {
+        "type": "string",
+        "description": "The name of the system or product being designed",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^[a-zA-Z0-9\\s\\-_]+$"
+      },
+      "Purpose": {
+        "type": "string",
+        "description": "A comprehensive description of the system's purpose, goals, and intended outcomes",
+        "minLength": 50,
+        "maxLength": 2000
+      },
+      "Responsibilities": {
+        "type": "array",
+        "description": "List of specific responsibilities and capabilities that the system must implement",
+        "minItems": 1,
+        "maxItems": 50,
+        "items": {
+          "type": "string",
+          "description": "A specific responsibility statement describing what the system must do",
+          "minLength": 20,
+          "maxLength": 500,
+          "pattern": "^It is the responsibility of the SuD to .+$"
+        },
+        "uniqueItems": true
+      },
+      "Exclusions": {
+        "type": "array",
+        "description": "List of explicit exclusions defining what the system will NOT implement or handle",
+        "minItems": 1,
+        "maxItems": 50,
+        "items": {
+          "type": "string",
+          "description": "An exclusion statement describing what the system will not do",
+          "minLength": 20,
+          "maxLength": 500,
+          "pattern": "^The SuD does not .+$"
+        },
+        "uniqueItems": true
+      }
+    },
+    "additionalProperties": false,
+    "examples": [
+      {
+        "Name": "ParityTax-AMM System",
+        "Purpose": "The purpose of the product is to create an equitable and efficient AMM liquidity provision system that addresses market concentration and welfare losses through dynamic JIT taxation, commitment-based reward systems, and real-time fiscal policy optimization, enabling fair fee distribution between JIT and PLP participants while providing developers with customizable fiscal policy frameworks.",
+        "Responsibilities": [
+          "It is the responsibility of the SuD to contribute to implementing dynamic JIT taxation system by calculating optimal tax rates and executing fee redistribution",
+          "It is the responsibility of the SuD to contribute to implementing commitment-based reward system by calculating credit accrual and distributing rewards to PLPs"
+        ],
+        "Exclusions": [
+          "The SuD does not implement the underlying AMM trading logic - this is provided by Uniswap v4 core",
+          "The SuD does not manage token custody or wallet functionality - this is handled by external wallet providers"
+        ]
+      }
+    ]
+  }
+  

@@ -1,0 +1,102 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Hierarchical System Design Document Schema",
+    "description": "JSON schema for hierarchical system design documents with responsibilities, services, and transactions",
+    "type": "object",
+    "required": ["root"],
+    "properties": {
+      "root": {
+        "type": "object",
+        "description": "Root container for the system design document",
+        "required": ["purpose", "responsibilities"],
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "description": "A comprehensive description of the system's purpose, goals, and intended outcomes",
+            "minLength": 50,
+            "maxLength": 2000,
+            "pattern": "^The purpose of the product is to .+$"
+          },
+          "responsibilities": {
+            "type": "array",
+            "description": "List of system responsibilities with their associated services and transactions",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/definitions/responsibility"
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false,
+    "definitions": {
+      "responsibility": {
+        "type": "object",
+        "description": "A system responsibility with its associated services and transactions",
+        "required": ["id", "description", "services"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the responsibility",
+            "pattern": "^R\\d+$",
+            "minLength": 2,
+            "maxLength": 10
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of what this responsibility entails",
+            "minLength": 20,
+            "maxLength": 500
+          },
+          "services": {
+            "type": "array",
+            "description": "List of services that implement this responsibility",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/definitions/service"
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "service": {
+        "type": "object",
+        "description": "A service that implements part of a responsibility",
+        "required": ["id", "description", "transactions"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the service",
+            "pattern": "^S\\d+\\.\\d+$",
+            "minLength": 4,
+            "maxLength": 10
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of what this service does",
+            "minLength": 20,
+            "maxLength": 300
+          },
+          "transactions": {
+            "type": "array",
+            "description": "List of specific transactions or operations this service performs",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "description": "A specific transaction or operation description",
+              "minLength": 10,
+              "maxLength": 200
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
