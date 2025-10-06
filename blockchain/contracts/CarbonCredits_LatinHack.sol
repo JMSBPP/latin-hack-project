@@ -1,96 +1,92 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1155} from "@papermoonio/openzeppelin-contracts-polkadot/contracts/token/ERC1155/ERC1155.sol";
-import {Ownable} from "@papermoonio/openzeppelin-contracts-polkadot/contracts/access/Ownable.sol";
-import {ICarbonCredits_LatinHack} from "./interfaces/ICarbonCredits_LatinHack.sol";
-import {ERC1155Burnable} from "@papermoonio/openzeppelin-contracts-polkadot/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
-import {AccessControlEnumerable} from "@papermoonio/openzeppelin-contracts-polkadot/contracts/access/extensions/AccessControlEnumerable.sol";
-import {IERC165} from "@papermoonio/openzeppelin-contracts-polkadot/contracts/utils/introspection/IERC165.sol";
-import {ERC165} from "@papermoonio/openzeppelin-contracts-polkadot/contracts/utils/introspection/ERC165.sol";
-
 /**
  * @title CarbonCredits_LatinHack
  * @author Equipo de desarrollo de E-co.lab
  * @notice Implementación mínima y autosuficiente de ERC-1155 para tokenizar créditos de carbono (RWA).
  * Cada crédito de carbono certificado se convierte en un nuevo tipo de token con una cantidad específica.
  */
-contract CarbonCredits_LatinHack is ICarbonCredits_LatinHack, ERC1155, ERC1155Burnable, AccessControlEnumerable {
-    
+
+contract CarbonCredits_LatinHack {
+
     // --- Variables de Estado ---
 
-    // Roles de control de acceso
-    bytes32 public constant CERTIFIER_ROLE = keccak256("CERTIFIER_ROLE");
-    bytes32 public constant VERIFIER_ROLE = keccak256("VERIFIER_ROLE");
+    address public admin;
+    mapping(address => bool) public isCertifier;
+    mapping(address => bool) public isVerifier;
 
-    // Datos específicos del negocio: cada 'id' de token mapea a los detalles de un crédito único
+    struct CarbonCredit {
+        string methodology;
+        uint256 co2eAmount;
+        uint256 timestamp;
+        string location;
+        bytes32 proofHash;
+    }
     mapping(uint256 => CarbonCredit) public creditDetails; 
     uint256 private _nextTokenId;
 
+    // Estructuras de datos ERC-1155
+    mapping(uint256 => mapping(address => uint256)) private _balances;
+    mapping(address => mapping(address => bool)) private _operatorApprovals;
+
+    // --- Eventos ---
+
+    event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 amount);
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
+    event CertifierRoleGranted(address indexed certifier);
+    event CertifierRoleRevoked(address indexed certifier);
+    event VerifierRoleGranted(address indexed verifier);
+    event VerifierRoleRevoked(address indexed verifier);
+    event CreditCertified(uint256 indexed creditId, address indexed creditOwner, string methodology, uint256 amount, string location, bytes32 proofHash);
+    event CreditRetired(uint256 indexed creditId, address indexed retiredBy, uint256 amount);
+
     // --- Modificadores ---
 
-    modifier onlyCertifier() {
-        _checkRole(CERTIFIER_ROLE);
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Llamador no es el admin");
         _;
     }
 
-    modifier onlyVerifier() {
-        _checkRole(VERIFIER_ROLE);
+    modifier onlyCertifier() {
+        require(isCertifier[msg.sender], "Llamador no es un certificador");
         _;
     }
 
     // --- Constructor ---
 
-    /**
-     * @notice Constructor del contrato CarbonCredits_LatinHack.
-     * @param initialAdmin La dirección del administrador inicial que tendrá todos los roles.
-     */
-    constructor(address initialAdmin) ERC1155("") {
-        _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
-        _grantRole(CERTIFIER_ROLE, initialAdmin);
+    constructor(address initialAdmin) {
+        admin = initialAdmin;
+        isCertifier[initialAdmin] = true;
+        isVerifier[initialAdmin] = true; // El admin también puede verificar
         emit CertifierRoleGranted(initialAdmin);
-    }
-
-    // --- Funciones de Soporte de Interfaces ---
-
-    /**
-     * @notice Verifica si el contrato soporta una interfaz específica.
-     * @param interfaceId El ID de la interfaz a verificar.
-     * @return Verdadero si el contrato soporta la interfaz, falso en caso contrario.
-     */
-    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControlEnumerable, IERC165, ERC1155) returns (bool) {
-        return type(ICarbonCredits_LatinHack).interfaceId == interfaceId || super.supportsInterface(interfaceId);
+        emit VerifierRoleGranted(initialAdmin);
     }
 
     // --- Gestión de Roles ---
 
-    /// @inheritdoc ICarbonCredits_LatinHack
-    function grantCertifierRole(address certifier) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _grantRole(CERTIFIER_ROLE, certifier);
+    function grantCertifierRole(address certifier) external onlyAdmin {
+        isCertifier[certifier] = true;
         emit CertifierRoleGranted(certifier);
     }
 
-    /// @inheritdoc ICarbonCredits_LatinHack
-    function revokeCertifierRole(address certifier) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _revokeRole(CERTIFIER_ROLE, certifier);
+    function revokeCertifierRole(address certifier) external onlyAdmin {
+        isCertifier[certifier] = false;
         emit CertifierRoleRevoked(certifier);
     }
 
-    /// @inheritdoc ICarbonCredits_LatinHack
-    function grantVerifierRole(address verifier) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _grantRole(VERIFIER_ROLE, verifier);
+    function grantVerifierRole(address verifier) external onlyAdmin {
+        isVerifier[verifier] = true;
         emit VerifierRoleGranted(verifier);
     }
 
-    /// @inheritdoc ICarbonCredits_LatinHack
-    function revokeVerifierRole(address verifier) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _revokeRole(VERIFIER_ROLE, verifier);
+    function revokeVerifierRole(address verifier) external onlyAdmin {
+        isVerifier[verifier] = false;
         emit VerifierRoleRevoked(verifier);
     }
 
     // --- Lógica Principal del Negocio ---
 
-    /// @inheritdoc ICarbonCredits_LatinHack
     function certifyAndMintCarbonCredit(
         address creditOwner,
         string memory methodology,
@@ -106,13 +102,50 @@ contract CarbonCredits_LatinHack is ICarbonCredits_LatinHack, ERC1155, ERC1155Bu
             location: location,
             proofHash: proofHash
         });
-        _mint(creditOwner, creditId, co2eAmount, "");
+        _mint(creditOwner, creditId, co2eAmount);
         emit CreditCertified(creditId, creditOwner, methodology, co2eAmount, location, proofHash);
     }
 
-    /// @inheritdoc ICarbonCredits_LatinHack
     function retireCredit(uint256 creditId, uint256 amount) external {
+        // La quema se realiza desde la dirección del llamador de la función
         burn(msg.sender, creditId, amount);
         emit CreditRetired(creditId, msg.sender, amount);
+    }
+
+    // --- Implementación Mínima de ERC-1155 ---
+
+    function balanceOf(address account, uint256 id) public view returns (uint256) {
+        return _balances[id][account];
+    }
+
+    function setApprovalForAll(address operator, bool approved) public {
+        _operatorApprovals[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    function isApprovedForAll(address account, address operator) public view returns (bool) {
+        return _operatorApprovals[account][operator];
+    }
+
+    function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes memory data) public {
+        require(from == msg.sender || isApprovedForAll(from, msg.sender), "ERC1155: no autorizado para transferir");
+        require(to != address(0), "ERC1155: no se puede transferir a la direccion cero");
+        require(_balances[id][from] >= amount, "ERC1155: balance insuficiente");
+        _balances[id][from] -= amount;
+        _balances[id][to] += amount;
+        emit TransferSingle(msg.sender, from, to, id, amount);
+    }
+    
+    function burn(address from, uint256 id, uint256 amount) public {
+        require(from == msg.sender || isApprovedForAll(from, msg.sender), "ERC1155: no autorizado para quemar");
+        require(_balances[id][from] >= amount, "ERC1155: balance insuficiente para quemar");
+        _balances[id][from] -= amount;
+        emit TransferSingle(msg.sender, from, address(0), id, amount);
+    }
+    
+    function _mint(address to, uint256 id, uint256 amount) private {
+        require(to != address(0), "ERC1155: no se puede acunar a la direccion cero");
+        _balances[id][to] += amount;
+        emit TransferSingle(msg.sender, address(0), to, id, amount);
     }
 }
