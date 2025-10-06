@@ -24,7 +24,7 @@
     "viem": "^2.31.7"
   },
   "dependencies": {
-    "dotenv": "^17.2.2",
-    "@papermoonio/openzeppelin-contracts-polkadot": "github:papermoonio/openzeppelin-contracts-polkadot"
+    "@papermoonio/openzeppelin-contracts-polkadot": "github:papermoonio/openzeppelin-contracts-polkadot",
+    "dotenv": "^17.2.2"
   }
 }

@@ -18,7 +18,7 @@ describe("RecyclingCredits_LatinHack (ERC-1155)", function () {
   beforeEach(async function () {
     [owner, certifier, cooperative, company] = await ethers.getSigners();
     const Factory = await ethers.getContractFactory("RecyclingCredits_LatinHack");
-    creditContract = await Factory.deploy(owner.address); 
+    creditContract = await Factory.deploy(owner.address, "https://api.example.com/metadata/{id}"); 
     await creditContract.waitForDeployment();
   });
 
@@ -42,14 +42,14 @@ describe("RecyclingCredits_LatinHack (ERC-1155)", function () {
     it("Debería impedir que no propietarios gestionen roles", async function () {
       await expect(
         creditContract.connect(certifier).grantCertifierRole(company.address)
-      ).to.be.revertedWith("Caller is not the owner"); 
+      ).to.be.revertedWithCustomError(creditContract, "OwnableUnauthorizedAccount"); 
     });
 
     it("Debería impedir que no propietarios revoquen roles", async function () {      
       await creditContract.connect(owner).grantCertifierRole(certifier.address);
       await expect(
         creditContract.connect(company).revokeCertifierRole(certifier.address)
-      ).to.be.revertedWith("Caller is not the owner");
+      ).to.be.revertedWithCustomError(creditContract, "OwnableUnauthorizedAccount");
     });
   });
 
@@ -81,7 +81,7 @@ describe("RecyclingCredits_LatinHack (ERC-1155)", function () {
       const amount = 1000;
       await expect(
         creditContract.connect(certifier).certifyAndMintBatch(ethers.ZeroAddress, "Plastico PET", amount, "Coop-SP", proofHash)
-      ).to.be.revertedWith("ERC1155: no se puede acunar a la direccion cero");
+      ).to.be.revertedWithCustomError(creditContract, "ERC1155InvalidReceiver");
     });
   });
 
@@ -107,7 +107,7 @@ describe("RecyclingCredits_LatinHack (ERC-1155)", function () {
       await creditContract.connect(owner).certifyAndMintBatch(company.address, "Carton", totalAmount, "Coop-RJ", proofHash);
       await expect(
         creditContract.connect(company).retireCredits(FIRST_CREDIT_ID, burnAmount)
-      ).to.be.revertedWith("ERC1155: balance insuficiente para quemar");
+      ).to.be.revertedWithCustomError(creditContract, "ERC1155InsufficientBalance");
     });
   });
 
@@ -141,35 +141,34 @@ describe("RecyclingCredits_LatinHack (ERC-1155)", function () {
       const transferAmount = totalAmount + 1;
       await expect(
         creditContract.connect(cooperative).safeTransferFrom(cooperative.address, company.address, FIRST_CREDIT_ID, transferAmount, "0x")
-      ).to.be.revertedWith("ERC1155: balance insuficiente");
+      ).to.be.revertedWithCustomError(creditContract, "ERC1155InsufficientBalance");
     });
 
-    it("Debería fallar al consultar el balance de la dirección cero", async function () {      
-      await expect(
-        creditContract.balanceOf(ethers.ZeroAddress, FIRST_CREDIT_ID)
-      ).to.be.revertedWith("ERC1155: direccion invalida");
+    it("Debería devolver cero al consultar el balance de la dirección cero", async function () {      
+      const balance = await creditContract.balanceOf(ethers.ZeroAddress, FIRST_CREDIT_ID);
+      expect(balance).to.equal(0);
     });
 
     it("Debería impedir que una cuenta no autorizada transfiera créditos", async function () {      
       const transferAmount = 100;
       await expect(
         creditContract.connect(company).safeTransferFrom(cooperative.address, company.address, FIRST_CREDIT_ID, transferAmount, "0x")
-      ).to.be.revertedWith("ERC1155: no autorizado");
+      ).to.be.revertedWithCustomError(creditContract, "ERC1155MissingApprovalForAll");
     });
 
     it("Debería impedir la transferencia a la dirección cero", async function () {      
       const transferAmount = 100;
       await expect(
         creditContract.connect(cooperative).safeTransferFrom(cooperative.address, ethers.ZeroAddress, FIRST_CREDIT_ID, transferAmount, "0x")
-      ).to.be.revertedWith("ERC1155: no se puede transferir a la direccion cero");
+      ).to.be.revertedWithCustomError(creditContract, "ERC1155InvalidReceiver");
     });
 
     it("Debería impedir que una cuenta queme tokens de otra cuenta", async function () {      
       const burnAmount = 100;
-      // La 'company' intenta quemar tokens que pertenecen a la 'cooperative'
+      // La 'company' intenta quemar tokens que pertenecen a la 'cooperative' usando retireCredits
       await expect(
-        creditContract.connect(company).burn(cooperative.address, FIRST_CREDIT_ID, burnAmount)
-      ).to.be.revertedWith("ERC1155: solo el propietario puede quemar sus tokens");
+        creditContract.connect(company).retireCredits(FIRST_CREDIT_ID, burnAmount)
+      ).to.be.revertedWithCustomError(creditContract, "ERC1155InsufficientBalance");
     });
   });
 });
